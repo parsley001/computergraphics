@@ -1,0 +1,19 @@
+{
+  "name": "computergraphics",
+  "version": "1.0.0",
+  "description": "p5.js assignments viewer - コンピューターグラフィックス課題表示システム",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": ["p5js", "graphics", "assignments", "education"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "vite": "^7.1.7"
+  },
+  "dependencies": {
+    "p5": "^2.0.5"
+  }
+}
