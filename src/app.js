@@ -1,70 +1,42 @@
 /**
- * p5.js Assignment Viewer - メインアプリケーションファイル
- * assignmentsフォルダ内のp5.jsファイルを動的に読み込んで表示するWebアプリケーション
+ * p5.js Assignment Viewer
+ * シンプルな課題ファイル表示システム
  */
 
-// 定数定義
+// 定数
 const SELECTORS = {
   FILE_SELECTOR: 'fileSelector',
   ERROR_MESSAGE: 'error-message'
-};
-
-const ATTRIBUTES = {
-  DYNAMIC_SCRIPT: 'data-dynamic'
 };
 
 const API_ENDPOINTS = {
   ASSIGNMENTS: '/api/assignments'
 };
 
-const URL_PARAMS = {
-  FILE: 'file'
-};
-
-/**
- * DOM要素取得のヘルパー関数
- */
+// DOM要素取得
 const DOM = {
   getFileSelector: () => document.getElementById(SELECTORS.FILE_SELECTOR),
   getErrorMessage: () => document.getElementById(SELECTORS.ERROR_MESSAGE),
   getCanvas: () => document.querySelector('canvas'),
-  getDynamicScript: () => document.querySelector(`script[${ATTRIBUTES.DYNAMIC_SCRIPT}]`)
+  getDynamicScript: () => document.querySelector('script[data-dynamic]')
 };
 
-/**
- * URLパラメータ操作のユーティリティ
- */
+// URL操作
 const URLUtils = {
-  getSelectedFile: () => new URLSearchParams(window.location.search).get(URL_PARAMS.FILE),
+  getSelectedFile: () => new URLSearchParams(window.location.search).get('file'),
   
-  setSelectedFile: (fileName) => {
+  updateURL: (fileName) => {
     const url = new URL(window.location);
-    url.searchParams.set(URL_PARAMS.FILE, fileName);
-    window.location.href = url.toString();
-  },
-  
-  clearSelectedFile: () => {
-    const url = new URL(window.location);
-    url.searchParams.delete(URL_PARAMS.FILE);
-    window.location.href = url.toString();
-  },
-  
-  updateURLQuiet: (fileName) => {
-    const url = new URL(window.location);
-    url.searchParams.set(URL_PARAMS.FILE, fileName);
-    window.history.replaceState({}, '', url.toString());
-  },
-  
-  clearSelectedFileQuiet: () => {
-    const url = new URL(window.location);
-    url.searchParams.delete(URL_PARAMS.FILE);
+    if (fileName) {
+      url.searchParams.set('file', fileName);
+    } else {
+      url.searchParams.delete('file');
+    }
     window.history.replaceState({}, '', url.toString());
   }
 };
 
-/**
- * エラーメッセージ管理
- */
+// エラー表示
 const ErrorManager = {
   show: (message) => {
     const errorDiv = DOM.getErrorMessage();
@@ -73,49 +45,31 @@ const ErrorManager = {
   },
   
   hide: () => {
-    const errorDiv = DOM.getErrorMessage();
-    errorDiv.style.display = 'none';
+    DOM.getErrorMessage().style.display = 'none';
   }
 };
 
-/**
- * コンテンツクリーンアップ
- */
+// コンテンツクリア
 const ContentCleaner = {
   clearAll: () => {
-    ContentCleaner.clearCanvas();
-    ContentCleaner.clearDynamicScript();
-    ContentCleaner.clearP5Globals();
-    ErrorManager.hide();
-  },
-  
-  clearCanvas: () => {
+    // キャンバス削除
     const canvas = DOM.getCanvas();
     if (canvas) canvas.remove();
-  },
-  
-  clearDynamicScript: () => {
+    
+    // スクリプト削除
     const script = DOM.getDynamicScript();
     if (script) script.remove();
-  },
-  
-  clearP5Globals: () => {
-    // p5.jsのグローバル関数をクリア
-    if (typeof window.setup === 'function') {
-      window.setup = undefined;
-    }
-    if (typeof window.draw === 'function') {
-      window.draw = undefined;
-    }
-    if (typeof window.preload === 'function') {
-      window.preload = undefined;
-    }
+    
+    // p5.js関数クリア
+    window.setup = undefined;
+    window.draw = undefined;
+    window.preload = undefined;
+    
+    ErrorManager.hide();
   }
 };
 
-/**
- * ドロップダウン管理
- */
+// ドロップダウン操作
 const DropdownManager = {
   clearOptions: () => {
     const selector = DOM.getFileSelector();
@@ -124,135 +78,136 @@ const DropdownManager = {
     }
   },
   
-  addOption: (fileName) => {
+  addOption: (filePath, displayName) => {
     const selector = DOM.getFileSelector();
     const option = document.createElement('option');
-    option.value = fileName;
-    option.textContent = fileName;
+    option.value = filePath;
+    option.textContent = displayName || filePath;
     selector.appendChild(option);
   },
   
-  setSelectedValue: (fileName) => {
-    const selector = DOM.getFileSelector();
-    selector.value = fileName;
-  },
-  
-  clearSelection: () => {
-    const selector = DOM.getFileSelector();
-    selector.value = '';
+  setSelectedValue: (filePath) => {
+    DOM.getFileSelector().value = filePath;
   }
 };
 
-/**
- * ファイルリスト管理
- */
-const FileListManager = {
-  async load() {
+// ファイル管理
+const FileManager = {
+  async loadFiles() {
     try {
       const response = await fetch(API_ENDPOINTS.ASSIGNMENTS);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      return data.map(item => item.name);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.json();
     } catch (error) {
-      console.error('ファイルリストの読み込みに失敗しました:', error);
-      ErrorManager.show('Vite開発サーバーが起動していない可能性があります。npm run dev を実行してください。');
+      console.error('ファイル読み込み失敗:', error);
+      ErrorManager.show('開発サーバーが起動していません。npm run dev を実行してください。');
       return [];
     }
   },
   
   populateDropdown(files) {
     DropdownManager.clearOptions();
-    files.forEach(fileName => DropdownManager.addOption(fileName));
+    
+    // ディレクトリ別にグループ化
+    const groups = {};
+    files.forEach(file => {
+      const dir = file.directory;
+      if (!groups[dir]) groups[dir] = [];
+      groups[dir].push(file);
+    });
+    
+    // ディレクトリ順に表示
+    Object.keys(groups).sort().forEach(directory => {
+      if (directory === 'root') {
+        // ルートファイル
+        groups[directory].forEach(file => {
+          DropdownManager.addOption(file.path, file.name);
+        });
+      } else {
+        // サブディレクトリ
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = `📁 ${directory}`;
+        DOM.getFileSelector().appendChild(optgroup);
+        
+        groups[directory].forEach(file => {
+          const option = document.createElement('option');
+          option.value = file.path;
+          option.textContent = `  ${file.name}`;
+          optgroup.appendChild(option);
+        });
+      }
+    });
   },
   
-  handleSelectedFile(files) {
+  selectFileFromURL(files) {
     const selectedFile = URLUtils.getSelectedFile();
-    
     if (!selectedFile) return;
     
-    if (files.includes(selectedFile)) {
+    const fileExists = files.some(file => file.path === selectedFile);
+    if (fileExists) {
       DropdownManager.setSelectedValue(selectedFile);
     } else {
-      console.warn('指定されたファイルが存在しません:', selectedFile);
-      URLUtils.clearSelectedFileQuiet();
-      ErrorManager.show(`ファイル "${selectedFile}" は削除されたか、存在しません。`);
+      URLUtils.updateURL('');
+      ErrorManager.show(`ファイル "${selectedFile}" が見つかりません。`);
     }
   }
 };
 
-/**
- * スクリプトローダー
- */
+// スクリプト読み込み
 const ScriptLoader = {
-  load(fileName) {
+  load(filePath) {
     const script = document.createElement('script');
-    script.src = `src/assignments/${fileName}`;
-    script.setAttribute(ATTRIBUTES.DYNAMIC_SCRIPT, 'true');
+    script.src = `/src/assignments/${filePath}`;
+    script.setAttribute('data-dynamic', 'true');
     
-    script.onerror = () => ScriptLoader.handleError(fileName);
     script.onload = () => {
       ErrorManager.hide();
-      // p5.jsの初期化を確実にするため、少し遅延させてsetup()を呼び出し
       setTimeout(() => {
         if (typeof window.setup === 'function') {
           try {
             window.setup();
           } catch (error) {
-            console.warn('setup()の実行中にエラーが発生しました:', error);
+            console.warn('setup実行エラー:', error);
           }
         }
       }, 50);
     };
     
+    script.onerror = () => {
+      console.error('スクリプト読み込み失敗:', filePath);
+      ErrorManager.show(`${filePath} の読み込みに失敗しました。`);
+    };
+    
     document.body.appendChild(script);
-  },
-  
-  handleError(fileName) {
-    console.error('ファイルの読み込みに失敗しました:', fileName);
-    ErrorManager.show(`エラー: ${fileName} を読み込めませんでした。ファイルが削除されたか、存在しない可能性があります。`);
-    URLUtils.clearSelectedFileQuiet();
-    DropdownManager.clearSelection();
   }
 };
 
-/**
- * メインアプリケーションクラス
- */
-class AssignmentViewer {
-  async initialize() {
-    await this.loadFileList();
-    this.setupEventListeners();
+// メインアプリケーション
+class App {
+  async init() {
+    const files = await FileManager.loadFiles();
+    FileManager.populateDropdown(files);
+    
+    if (files.length > 0) {
+      FileManager.selectFileFromURL(files);
+    }
+    
+    this.setupEvents();
     this.loadSelectedFile();
   }
   
-  async loadFileList() {
-    const files = await FileListManager.load();
-    FileListManager.populateDropdown(files);
-    
-    if (files.length > 0) {
-      FileListManager.handleSelectedFile(files);
-    }
+  setupEvents() {
+    DOM.getFileSelector().addEventListener('change', (e) => {
+      this.selectFile(e.target.value);
+    });
   }
   
-  setupEventListeners() {
-    const selector = DOM.getFileSelector();
-    selector.addEventListener('change', (e) => this.handleFileSelection(e.target.value));
-  }
-  
-  handleFileSelection(fileName) {
+  selectFile(filePath) {
     ContentCleaner.clearAll();
+    URLUtils.updateURL(filePath);
     
-    if (fileName) {
-      // ページ再読み込みではなく、その場でスクリプトを読み込み
-      URLUtils.updateURLQuiet(fileName);
-      ScriptLoader.load(fileName);
-    } else {
-      // ファイルが選択されていない場合はURLパラメータを削除
-      URLUtils.clearSelectedFileQuiet();
+    if (filePath) {
+      ScriptLoader.load(filePath);
     }
   }
   
@@ -264,8 +219,15 @@ class AssignmentViewer {
   }
 }
 
-// アプリケーション初期化
-document.addEventListener('DOMContentLoaded', () => {
-  const app = new AssignmentViewer();
-  app.initialize();
-});
+// 初期化
+function init() {
+  const app = new App();
+  app.init();
+}
+
+// DOM準備完了時に実行
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}

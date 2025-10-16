@@ -1,10 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
   <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>p5.js Assignment Viewer</title>
-    <script src="node_modules/p5/lib/p5.js"></script>
-    <script src="src/utils.js"></script>
   </head>
   <body>
     <select id="fileSelector">
@@ -13,6 +12,53 @@
     
     <div id="error-message" style="display: none; color: red; margin-top: 10px;"></div>
     
-    <script src="src/app.js"></script>
+    <script>
+      // p5.js読み込み
+      function loadP5() {
+        return new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = '/p5.min.js';
+          
+          script.onload = () => {
+            if (typeof window.p5 === 'function' && !window.createCanvas) {
+              new window.p5();
+              setTimeout(resolve, 100);
+            } else {
+              resolve();
+            }
+          };
+          
+          script.onerror = () => reject(new Error('p5.js読み込み失敗'));
+          document.head.appendChild(script);
+        });
+      }
+      
+      // アプリ読み込み
+      function loadApp() {
+        return new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.type = 'module';
+          script.src = 'src/app.js';
+          script.onload = resolve;
+          script.onerror = () => reject(new Error('app.js読み込み失敗'));
+          document.head.appendChild(script);
+        });
+      }
+      
+      // 初期化
+      async function init() {
+        try {
+          await loadP5();
+          await loadApp();
+        } catch (error) {
+          console.error('初期化エラー:', error);
+          const errorDiv = document.getElementById('error-message');
+          errorDiv.textContent = '初期化に失敗しました。ページを再読み込みしてください。';
+          errorDiv.style.display = 'block';
+        }
+      }
+      
+      init();
+    </script>
   </body>
 </html>

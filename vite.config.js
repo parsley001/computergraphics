@@ -23,13 +23,49 @@ function sortAssignmentFiles(a, b) {
 }
 
 /**
+ * ディレクトリを再帰的に検索してJSファイルを取得する関数
+ */
+function getJSFilesRecursively(dir, basePath = '') {
+    const files = [];
+    
+    try {
+        const items = fs.readdirSync(dir);
+        
+        for (const item of items) {
+            const fullPath = path.join(dir, item);
+            const stat = fs.statSync(fullPath);
+            
+            if (stat.isDirectory()) {
+                // サブディレクトリを再帰的に検索
+                const subPath = basePath ? `${basePath}/${item}` : item;
+                files.push(...getJSFilesRecursively(fullPath, subPath));
+            } else if (item.endsWith('.js')) {
+                // JSファイルを追加
+                const relativePath = basePath ? `${basePath}/${item}` : item;
+                files.push({
+                    name: item,
+                    path: relativePath,
+                    basename: path.basename(item, '.js'),
+                    directory: basePath || 'root'
+                });
+            }
+        }
+    } catch (error) {
+        console.warn(`ディレクトリの読み込みに失敗: ${dir}`, error.message);
+    }
+    
+    return files;
+}
+
+/**
  * Assignment Files API Plugin for Vite
  * 
  * assignmentsフォルダのファイル一覧を提供するViteプラグイン
  * 開発時にリアルタイムでファイルリストを取得するためのAPIエンドポイント `/api/assignments` を作成します。
  * 
  * 機能:
- * - assignmentsフォルダ内の.jsファイルを自動検出
+ * - assignmentsフォルダ内の.jsファイルを再帰的に自動検出
+ * - サブディレクトリ構造をサポート
  * - ファイル名の自然順ソート（2-1.js < 2-2.js < 10-1.js）
  * - JSON形式でファイル情報を返却
  * 
@@ -44,14 +80,15 @@ function assignmentsPlugin() {
                     try {
                         const assignmentsDir = path.join(process.cwd(), 'src', 'assignments');
                         
-                        // ディレクトリ内の.jsファイルを取得・整形・ソート
-                        const files = fs.readdirSync(assignmentsDir)
-                            .filter(file => file.endsWith('.js'))
-                            .map(file => ({
-                                name: file,
-                                basename: path.basename(file, '.js')
-                            }))
-                            .sort((a, b) => sortAssignmentFiles(a.name, b.name));
+                        // ディレクトリ内の.jsファイルを再帰的に取得・整形・ソート
+                        const files = getJSFilesRecursively(assignmentsDir)
+                            .sort((a, b) => {
+                                // ディレクトリ名でまずソート、その後ファイル名でソート
+                                if (a.directory !== b.directory) {
+                                    return a.directory.localeCompare(b.directory);
+                                }
+                                return sortAssignmentFiles(a.name, b.name);
+                            });
                         
                         // JSON形式でレスポンス
                         res.setHeader('Content-Type', 'application/json');

@@ -75,3 +75,7 @@ out/
 # Temporary files
 tmp/
 temp/
+
+# Public directory (copied libraries)
+public/p5.js
+public/p5.min.js
