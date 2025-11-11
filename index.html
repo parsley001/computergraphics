@@ -20,6 +20,7 @@
           script.src = '/p5.min.js';
           
           script.onload = () => {
+            // p5.jsをグローバルモードで初期化
             if (typeof window.p5 === 'function' && !window.createCanvas) {
               new window.p5();
               setTimeout(resolve, 100);
