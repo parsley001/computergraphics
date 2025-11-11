@@ -52,7 +52,12 @@ const ErrorManager = {
 // コンテンツクリア
 const ContentCleaner = {
   clearAll: () => {
-    // キャンバス削除
+    // p5.jsのループを停止
+    if (typeof window.noLoop === 'function') {
+      window.noLoop();
+    }
+    
+    // キャンバスを削除
     const canvas = DOM.getCanvas();
     if (canvas) canvas.remove();
     
@@ -64,6 +69,12 @@ const ContentCleaner = {
     window.setup = undefined;
     window.draw = undefined;
     window.preload = undefined;
+    window.mousePressed = undefined;
+    window.mouseReleased = undefined;
+    window.keyPressed = undefined;
+    window.keyReleased = undefined;
+    window.mouseDragged = undefined;
+    window.mouseWheel = undefined;
     
     ErrorManager.hide();
   }
@@ -162,15 +173,23 @@ const ScriptLoader = {
     
     script.onload = () => {
       ErrorManager.hide();
+      
+      // グローバルモードで動作するため、setup()が自動実行される
+      // ただし、明示的に呼び出してリフレッシュする
       setTimeout(() => {
         if (typeof window.setup === 'function') {
           try {
             window.setup();
+            // draw関数が定義されている場合はループを開始
+            if (typeof window.draw === 'function' && typeof window.loop === 'function') {
+              window.loop();
+            }
           } catch (error) {
-            console.warn('setup実行エラー:', error);
+            console.error('setup実行エラー:', error);
+            ErrorManager.show(`${filePath} の実行中にエラーが発生しました: ${error.message}`);
           }
         }
-      }, 50);
+      }, 100);
     };
     
     script.onerror = () => {
