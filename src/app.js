@@ -13,11 +13,14 @@ const API_ENDPOINTS = {
   ASSIGNMENTS: '/api/assignments'
 };
 
+// p5.jsインスタンス管理
+let currentP5Instance = null;
+
 // DOM要素取得
 const DOM = {
   getFileSelector: () => document.getElementById(SELECTORS.FILE_SELECTOR),
   getErrorMessage: () => document.getElementById(SELECTORS.ERROR_MESSAGE),
-  getCanvas: () => document.querySelector('canvas'),
+  getAllCanvases: () => document.querySelectorAll('canvas'),
   getDynamicScript: () => document.querySelector('script[data-dynamic]')
 };
 
@@ -52,14 +55,39 @@ const ErrorManager = {
 // コンテンツクリア
 const ContentCleaner = {
   clearAll: () => {
-    // p5.jsのループを停止
-    if (typeof window.noLoop === 'function') {
-      window.noLoop();
+    // p5.jsのループを停止（エラーを無視）
+    try {
+      if (typeof window.noLoop === 'function') {
+        window.noLoop();
+      }
+    } catch (e) {
+      console.warn('noLoop停止エラー:', e);
     }
     
-    // キャンバスを削除
-    const canvas = DOM.getCanvas();
-    if (canvas) canvas.remove();
+    // p5インスタンスを適切に破棄
+    if (currentP5Instance) {
+      try {
+        currentP5Instance.remove();
+      } catch (e) {
+        console.warn('p5インスタンス破棄エラー:', e);
+      }
+      currentP5Instance = null;
+    }
+    
+    // 残っているcanvas要素をすべて削除（WebGLコンテキストも含む）
+    DOM.getAllCanvases().forEach(canvas => {
+      try {
+        // WebGLコンテキストを明示的にロスさせる
+        const gl = canvas.getContext('webgl') || canvas.getContext('webgl2');
+        if (gl) {
+          const ext = gl.getExtension('WEBGL_lose_context');
+          if (ext) ext.loseContext();
+        }
+      } catch (e) {
+        // WebGLコンテキスト取得失敗は無視
+      }
+      canvas.remove();
+    });
     
     // スクリプト削除
     const script = DOM.getDynamicScript();
@@ -75,6 +103,11 @@ const ContentCleaner = {
     window.keyReleased = undefined;
     window.mouseDragged = undefined;
     window.mouseWheel = undefined;
+    window.mouseMoved = undefined;
+    window.mouseClicked = undefined;
+    window.doubleClicked = undefined;
+    window.windowResized = undefined;
+    window.keyTyped = undefined;
     
     ErrorManager.hide();
   }
@@ -174,22 +207,71 @@ const ScriptLoader = {
     script.onload = () => {
       ErrorManager.hide();
       
-      // グローバルモードで動作するため、setup()が自動実行される
-      // ただし、明示的に呼び出してリフレッシュする
+      // スクリプト読み込み完了後、p5.jsインスタンスを作成
       setTimeout(() => {
         if (typeof window.setup === 'function') {
           try {
-            window.setup();
-            // draw関数が定義されている場合はループを開始
-            if (typeof window.draw === 'function' && typeof window.loop === 'function') {
-              window.loop();
-            }
+            // グローバル関数をキャプチャ
+            const userSetup = window.setup;
+            const userDraw = window.draw;
+            const userPreload = window.preload;
+            const userMousePressed = window.mousePressed;
+            const userMouseReleased = window.mouseReleased;
+            const userMouseDragged = window.mouseDragged;
+            const userMouseMoved = window.mouseMoved;
+            const userMouseClicked = window.mouseClicked;
+            const userMouseWheel = window.mouseWheel;
+            const userDoubleClicked = window.doubleClicked;
+            const userKeyPressed = window.keyPressed;
+            const userKeyReleased = window.keyReleased;
+            const userKeyTyped = window.keyTyped;
+            const userWindowResized = window.windowResized;
+            
+            // p5.jsインスタンスモードで作成
+            currentP5Instance = new p5((p) => {
+              // preload（必要な場合）
+              if (userPreload) {
+                p.preload = function() {
+                  // グローバル関数をp5インスタンスのメソッドとして実行
+                  userPreload.call(p);
+                };
+              }
+              
+              // setup
+              p.setup = function() {
+                userSetup.call(p);
+              };
+              
+              // draw
+              if (userDraw) {
+                p.draw = function() {
+                  userDraw.call(p);
+                };
+              }
+              
+              // マウスイベント
+              if (userMousePressed) p.mousePressed = function() { userMousePressed.call(p); };
+              if (userMouseReleased) p.mouseReleased = function() { userMouseReleased.call(p); };
+              if (userMouseDragged) p.mouseDragged = function() { userMouseDragged.call(p); };
+              if (userMouseMoved) p.mouseMoved = function() { userMouseMoved.call(p); };
+              if (userMouseClicked) p.mouseClicked = function() { userMouseClicked.call(p); };
+              if (userMouseWheel) p.mouseWheel = function(e) { userMouseWheel.call(p, e); };
+              if (userDoubleClicked) p.doubleClicked = function() { userDoubleClicked.call(p); };
+              
+              // キーボードイベント
+              if (userKeyPressed) p.keyPressed = function() { userKeyPressed.call(p); };
+              if (userKeyReleased) p.keyReleased = function() { userKeyReleased.call(p); };
+              if (userKeyTyped) p.keyTyped = function() { userKeyTyped.call(p); };
+              
+              // ウィンドウイベント
+              if (userWindowResized) p.windowResized = function() { userWindowResized.call(p); };
+            });
           } catch (error) {
-            console.error('setup実行エラー:', error);
+            console.error('p5初期化エラー:', error);
             ErrorManager.show(`${filePath} の実行中にエラーが発生しました: ${error.message}`);
           }
         }
-      }, 100);
+      }, 50);
     };
     
     script.onerror = () => {
