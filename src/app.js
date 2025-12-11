@@ -138,7 +138,13 @@ const ScriptLoader = {
     
     script.onload = () => {
       ErrorManager.hide();
-      // p5.jsグローバルモードで自動的にsetup/drawが実行される
+      // p5.jsが自動初期化しない場合があるため、明示的に初期化
+      // setup関数が定義されていてcanvasがない場合に初期化する
+      setTimeout(() => {
+        if (typeof window.setup === 'function' && !document.querySelector('canvas')) {
+          new p5();
+        }
+      }, 50);
     };
     
     script.onerror = () => {
