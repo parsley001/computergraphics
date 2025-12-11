@@ -74,18 +74,9 @@ const ContentCleaner = {
       currentP5Instance = null;
     }
     
-    // 残っているcanvas要素をすべて削除（WebGLコンテキストも含む）
+    // 残っているcanvas要素をすべて削除
+    // 注意: WebGL loseContextは呼び出さない（次のWebGL作成を妨げるため）
     DOM.getAllCanvases().forEach(canvas => {
-      try {
-        // WebGLコンテキストを明示的にロスさせる
-        const gl = canvas.getContext('webgl') || canvas.getContext('webgl2');
-        if (gl) {
-          const ext = gl.getExtension('WEBGL_lose_context');
-          if (ext) ext.loseContext();
-        }
-      } catch (e) {
-        // WebGLコンテキスト取得失敗は無視
-      }
       canvas.remove();
     });
     
