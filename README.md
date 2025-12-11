@@ -118,13 +118,14 @@ http://localhost:3000/?file=2/2-1.js
 computergraphics/
 ├── src/
 │   ├── app.js              # メインアプリケーションファイル
-│   ├── utils.js            # ユーティリティ関数
+│   ├── init.js             # 初期化モジュール
 │   └── assignments/        # 課題ファイル格納フォルダ
-│       ├── 2/              # 章番号別サブディレクトリ
 │       └── samples/        # サンプルファイル用サブディレクトリ
 │           ├── sample1.js  # サンプル課題1
 │           ├── sample2.js  # サンプル課題2
 │           └── sample3.js  # サンプル課題3
+├── vite-plugins/
+│   └── assignments-plugin.js  # Viteプラグイン
 ├── index.html              # メインHTMLファイル
 ├── vite.config.js          # Vite設定ファイル
 ├── package.json            # プロジェクト設定
