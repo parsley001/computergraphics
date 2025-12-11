@@ -1,6 +1,9 @@
 /**
  * p5.js Assignment Viewer
  * シンプルな課題ファイル表示システム
+ * 
+ * ファイル切り替え時はページリロードを行い、
+ * WebGLコンテキストとグローバル状態を完全にリセットします。
  */
 
 // 定数
@@ -13,29 +16,22 @@ const API_ENDPOINTS = {
   ASSIGNMENTS: '/api/assignments'
 };
 
-// p5.jsインスタンス管理
-let currentP5Instance = null;
-
 // DOM要素取得
 const DOM = {
   getFileSelector: () => document.getElementById(SELECTORS.FILE_SELECTOR),
-  getErrorMessage: () => document.getElementById(SELECTORS.ERROR_MESSAGE),
-  getAllCanvases: () => document.querySelectorAll('canvas'),
-  getDynamicScript: () => document.querySelector('script[data-dynamic]')
+  getErrorMessage: () => document.getElementById(SELECTORS.ERROR_MESSAGE)
 };
 
 // URL操作
 const URLUtils = {
   getSelectedFile: () => new URLSearchParams(window.location.search).get('file'),
   
-  updateURL: (fileName) => {
-    const url = new URL(window.location);
+  buildURL: (fileName) => {
+    const url = new URL(window.location.origin + window.location.pathname);
     if (fileName) {
       url.searchParams.set('file', fileName);
-    } else {
-      url.searchParams.delete('file');
     }
-    window.history.replaceState({}, '', url.toString());
+    return url.toString();
   }
 };
 
@@ -49,58 +45,6 @@ const ErrorManager = {
   
   hide: () => {
     DOM.getErrorMessage().style.display = 'none';
-  }
-};
-
-// コンテンツクリア
-const ContentCleaner = {
-  clearAll: () => {
-    // p5.jsのループを停止（エラーを無視）
-    try {
-      if (typeof window.noLoop === 'function') {
-        window.noLoop();
-      }
-    } catch (e) {
-      console.warn('noLoop停止エラー:', e);
-    }
-    
-    // p5インスタンスを適切に破棄
-    if (currentP5Instance) {
-      try {
-        currentP5Instance.remove();
-      } catch (e) {
-        console.warn('p5インスタンス破棄エラー:', e);
-      }
-      currentP5Instance = null;
-    }
-    
-    // 残っているcanvas要素をすべて削除
-    // 注意: WebGL loseContextは呼び出さない（次のWebGL作成を妨げるため）
-    DOM.getAllCanvases().forEach(canvas => {
-      canvas.remove();
-    });
-    
-    // スクリプト削除
-    const script = DOM.getDynamicScript();
-    if (script) script.remove();
-    
-    // p5.js関数クリア
-    window.setup = undefined;
-    window.draw = undefined;
-    window.preload = undefined;
-    window.mousePressed = undefined;
-    window.mouseReleased = undefined;
-    window.keyPressed = undefined;
-    window.keyReleased = undefined;
-    window.mouseDragged = undefined;
-    window.mouseWheel = undefined;
-    window.mouseMoved = undefined;
-    window.mouseClicked = undefined;
-    window.doubleClicked = undefined;
-    window.windowResized = undefined;
-    window.keyTyped = undefined;
-    
-    ErrorManager.hide();
   }
 };
 
@@ -154,12 +98,10 @@ const FileManager = {
     // ディレクトリ順に表示
     Object.keys(groups).sort().forEach(directory => {
       if (directory === 'root') {
-        // ルートファイル
         groups[directory].forEach(file => {
           DropdownManager.addOption(file.path, file.name);
         });
       } else {
-        // サブディレクトリ
         const optgroup = document.createElement('optgroup');
         optgroup.label = `📁 ${directory}`;
         DOM.getFileSelector().appendChild(optgroup);
@@ -182,7 +124,6 @@ const FileManager = {
     if (fileExists) {
       DropdownManager.setSelectedValue(selectedFile);
     } else {
-      URLUtils.updateURL('');
       ErrorManager.show(`ファイル "${selectedFile}" が見つかりません。`);
     }
   }
@@ -197,72 +138,7 @@ const ScriptLoader = {
     
     script.onload = () => {
       ErrorManager.hide();
-      
-      // スクリプト読み込み完了後、p5.jsインスタンスを作成
-      setTimeout(() => {
-        if (typeof window.setup === 'function') {
-          try {
-            // グローバル関数をキャプチャ
-            const userSetup = window.setup;
-            const userDraw = window.draw;
-            const userPreload = window.preload;
-            const userMousePressed = window.mousePressed;
-            const userMouseReleased = window.mouseReleased;
-            const userMouseDragged = window.mouseDragged;
-            const userMouseMoved = window.mouseMoved;
-            const userMouseClicked = window.mouseClicked;
-            const userMouseWheel = window.mouseWheel;
-            const userDoubleClicked = window.doubleClicked;
-            const userKeyPressed = window.keyPressed;
-            const userKeyReleased = window.keyReleased;
-            const userKeyTyped = window.keyTyped;
-            const userWindowResized = window.windowResized;
-            
-            // p5.jsインスタンスモードで作成
-            currentP5Instance = new p5((p) => {
-              // preload（必要な場合）
-              if (userPreload) {
-                p.preload = function() {
-                  // グローバル関数をp5インスタンスのメソッドとして実行
-                  userPreload.call(p);
-                };
-              }
-              
-              // setup
-              p.setup = function() {
-                userSetup.call(p);
-              };
-              
-              // draw
-              if (userDraw) {
-                p.draw = function() {
-                  userDraw.call(p);
-                };
-              }
-              
-              // マウスイベント
-              if (userMousePressed) p.mousePressed = function() { userMousePressed.call(p); };
-              if (userMouseReleased) p.mouseReleased = function() { userMouseReleased.call(p); };
-              if (userMouseDragged) p.mouseDragged = function() { userMouseDragged.call(p); };
-              if (userMouseMoved) p.mouseMoved = function() { userMouseMoved.call(p); };
-              if (userMouseClicked) p.mouseClicked = function() { userMouseClicked.call(p); };
-              if (userMouseWheel) p.mouseWheel = function(e) { userMouseWheel.call(p, e); };
-              if (userDoubleClicked) p.doubleClicked = function() { userDoubleClicked.call(p); };
-              
-              // キーボードイベント
-              if (userKeyPressed) p.keyPressed = function() { userKeyPressed.call(p); };
-              if (userKeyReleased) p.keyReleased = function() { userKeyReleased.call(p); };
-              if (userKeyTyped) p.keyTyped = function() { userKeyTyped.call(p); };
-              
-              // ウィンドウイベント
-              if (userWindowResized) p.windowResized = function() { userWindowResized.call(p); };
-            });
-          } catch (error) {
-            console.error('p5初期化エラー:', error);
-            ErrorManager.show(`${filePath} の実行中にエラーが発生しました: ${error.message}`);
-          }
-        }
-      }, 50);
+      // p5.jsグローバルモードで自動的にsetup/drawが実行される
     };
     
     script.onerror = () => {
@@ -290,17 +166,15 @@ class App {
   
   setupEvents() {
     DOM.getFileSelector().addEventListener('change', (e) => {
-      this.selectFile(e.target.value);
+      this.navigateToFile(e.target.value);
     });
   }
   
-  selectFile(filePath) {
-    ContentCleaner.clearAll();
-    URLUtils.updateURL(filePath);
-    
-    if (filePath) {
-      ScriptLoader.load(filePath);
-    }
+  navigateToFile(filePath) {
+    // ファイル切り替え時はページをリロードして確実に初期化
+    // これによりWebGLコンテキストやグローバル状態が完全にリセットされる
+    const newURL = URLUtils.buildURL(filePath);
+    window.location.href = newURL;
   }
   
   loadSelectedFile() {

@@ -13,13 +13,10 @@ function loadP5() {
         script.src = '/p5.min.js';
         
         script.onload = () => {
-            // p5.jsをグローバルモードで初期化
-            if (typeof window.p5 === 'function' && !window.createCanvas) {
-                new window.p5();
-                setTimeout(resolve, 100);
-            } else {
-                resolve();
-            }
+            // p5.jsの読み込み完了
+            // 注意: new p5() は呼び出さない
+            // グローバルモードでは、setup/draw関数が定義された後に自動的に初期化される
+            resolve();
         };
         
         script.onerror = () => reject(new Error('p5.js読み込み失敗'));
@@ -34,7 +31,6 @@ function loadP5() {
 function loadApp() {
     return new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.type = 'module';
         script.src = '/src/app.js';
         script.onload = resolve;
         script.onerror = () => reject(new Error('app.js読み込み失敗'));
