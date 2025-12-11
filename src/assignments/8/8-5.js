@@ -15,7 +15,7 @@ function draw() {
     // --- 環境光のみ ---  
     if (mode == 1) {
         ambientLight(80);
-        ambientMaterial(0, 100, 255);
+        ambientMaterial(255, 100, 255);
     }
     // --- 拡散反射を近似 ---  
     if (mode == 2) {
