@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>CG08/Assignment8-9</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.10/p5.js"></script>
+    </head>
+    <body>
+            WASD: 移動<br>
+            SPACE: 切替<br>
+            DELETE: 削除<br>
+            ENTER: 追加<br>
+            追加するスポットライトの色<input type="color" id="colorbox" value="#ffff00" />
+        <script>
+            class SpotLight {
+                constructor(color, pos, chroma) {
+                    this.r = parseInt(color.substr(1, 2), 16);
+                    this.g = parseInt(color.substr(3, 2), 16);
+                    this.b = parseInt(color.substr(5, 2), 16);
+                    this.x = pos[0];
+                    this.y = pos[1];
+                    this.z = pos[2];
+                    this.c = chroma;
+                }
+
+                changeColor(color) {
+                    this.r = parseInt(color.substr(1, 2), 16);
+                    this.g = parseInt(color.substr(3, 2), 16);
+                    this.b = parseInt(color.substr(5, 2), 16);
+                }
+
+                changeChroma(chroma) {
+                    this.c = chroma;
+                }
+
+                move(diff) {
+                    this.x += diff[0];
+                    this.y += diff[1];
+                    this.z += diff[2];
+                }
+
+                draw() {
+                    spotLight(
+                        this.r,
+                        this.g,
+                        this.b,
+                        this.x,
+                        -this.y,
+                        this.z,
+                        0,
+                        1,
+                        0
+                    );
+                    push();
+                    translate(this.x, -this.y, this.z);
+                    ambientLight(this.c);
+                    ambientMaterial(this.r, this.g, this.b);
+                    sphere(10);
+                    pop();
+                }
+            }
+
+            function setup() {
+                createCanvas(600, 400, WEBGL);
+                camera(-1000, -500, -1000, 0, 0, 0, 0, 1, 0);
+                noStroke();
+            }
+
+            let spotlights = [
+                new SpotLight('#ff0000', [0, 100, 0], 255),
+                new SpotLight('#00ff00', [150, 100, 0], 100),
+                new SpotLight('#0000ff', [0, 100, 150], 100),
+            ];
+            let selected = 0;
+
+            function draw() {
+                background(80);
+                orbitControl();
+                ambientLight(20);
+
+                spotlights.forEach((sl) => {
+                    sl.draw();
+                });
+
+                push();
+                translate(0, -30, 0);
+                rotateX(PI / 2);
+                ambientLight(24);
+                specularMaterial(255, 255, 255);
+                torus(50, 20);
+                pop();
+
+                push();
+                translate(0, -41, 150);
+                rotateX(PI / 2);
+                ambientLight(24);
+                specularMaterial(255, 255, 255);
+                box(80);
+                pop();
+
+                push();
+                translate(150, -30, 0);
+                rotateX(PI);
+                ambientLight(24);
+                specularMaterial(255, 255, 255);
+                cone(50, 50);
+                pop();
+
+                push();
+                rotateX(PI / 2);
+                plane(5000);
+                pop();
+            }
+
+            function keyPressed() {
+                if (key === 'r') {
+                    camera(1000, 0, 0, 0, 0, 0, 0, 1, 0);
+                }
+                if (key === 'w') {
+                    spotlights[selected].move([5, 0, 0]);
+                }
+                if (key === 's') {
+                    spotlights[selected].move([-5, 0, 0]);
+                }
+                if (key === 'a') {
+                    spotlights[selected].move([0, 0, -5]);
+                }
+                if (key === 'd') {
+                    spotlights[selected].move([0, 0, 5]);
+                }
+                if (key === ' ') {
+                    spotlights[selected].changeChroma(100);
+                    selected = (selected + 1) % spotlights.length;
+                    spotlights[selected].changeChroma(255);
+                }
+                if (keyCode === ENTER) {
+                    if (spotlights.length > 0) {
+                        spotlights[selected].changeChroma(100);
+                    }
+                    selected = spotlights.length;
+                    const color = document.getElementById('colorbox').value;
+                    spotlights.push(new SpotLight(color, [0, 100, 0], 255));
+                }
+                if (keyCode === DELETE) {
+                    spotlights.splice(selected, 1);
+                    selected = (selected + 1) % spotlights.length;
+                    spotlights[selected].changeChroma(255);
+                }
+            }
+        </script>
+    </body>
+</html>
