@@ -8,13 +8,18 @@
     "build": "vite build",
     "preview": "vite preview"
   },
-  "keywords": ["p5js", "graphics", "assignments", "education"],
+  "keywords": [
+    "p5js",
+    "graphics",
+    "assignments",
+    "education"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "vite": "^7.1.7"
   },
   "dependencies": {
-    "p5": "^2.0.5"
+    "p5": "^1.11.10"
   }
 }
